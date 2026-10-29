@@ -1,0 +1,389 @@
+  <!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>โปรแกรมสุ่มสี กีฬาสีครู (แบบสุ่มทีละสี)</title>
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .main-btn {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 22px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 15px rgba(46, 204, 113, 0.4);
+            transition: all 0.3s ease;
+            font-family: 'Sarabun', sans-serif;
+        }
+        .main-btn:hover {
+            background-color: #27ae60;
+            transform: translateY(-2px);
+        }
+        .main-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+        
+        .teams-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .team-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            opacity: 0.5;
+            transition: all 0.5s ease;
+            transform: scale(0.95);
+            min-height: 400px;
+        }
+        .team-card.active {
+            opacity: 1;
+            transform: scale(1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        .team-card.revealed {
+            opacity: 1;
+            transform: scale(1);
+            border: 2px solid #ddd;
+        }
+
+        .team-header {
+            padding: 15px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .team-header.red { background-color: #e74c3c; color: white; }
+        .team-header.blue { background-color: #3498db; color: white; }
+        .team-header.yellow { background-color: #f1c40f; color: #333; }
+        .team-header.orange { background-color: #e67e22; color: white; }
+        
+        .team-stats {
+            text-align: center;
+            padding: 10px;
+            background-color: #f1f2f6;
+            font-size: 14px;
+            color: #555;
+            border-bottom: 1px solid #eee;
+            font-weight: bold;
+            display: none;
+        }
+        .team-card.revealed .team-stats {
+            display: block;
+            animation: fadeIn 1s;
+        }
+
+        .member-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .member-list li {
+            padding: 10px 15px;
+            border-bottom: 1px dashed #eee;
+            font-size: 15px;
+            text-align: center;
+        }
+        .member-list li:last-child {
+            border-bottom: none;
+        }
+        
+        /* สีของเพศตอนแสดงผลจริง */
+        .revealed .gender-m { color: #2980b9; font-weight: 600; }
+        .revealed .gender-f { color: #8e44ad; font-weight: 600; }
+        
+        /* เอฟเฟกต์ตอนกำลังสุ่ม */
+        .animating-list li {
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes pulseAlert {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        .pulsing {
+            animation: pulseAlert 0.3s infinite;
+        }
+
+        /* สถานะรอสุ่ม */
+        .waiting-text {
+            text-align: center;
+            padding: 50px 20px;
+            color: #bdc3c7;
+            font-size: 40px;
+        }
+
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>🎲 โปรแกรมสุ่มแบ่งสีครู</h1>
+        <p style="color: #666; margin-top: -15px; margin-bottom: 20px;">จัดสรรชาย-หญิง คละกันเท่าๆ กัน</p>
+        <button id="actionBtn" class="main-btn" onclick="startNextReveal()">เตรียมพร้อมสุ่มสีแรก!</button>
+    </div>
+    
+    <div class="teams-grid" id="teamsContainer">
+        <!-- การ์ดทั้ง 4 สีจะถูกวาดที่นี่ -->
+    </div>
+</div>
+
+<script>
+    // ข้อมูลรายชื่อที่นำตำแหน่งในวงเล็บออกแล้ว
+    const rawData = `นาง สิริขวัญ บุญแจ้ง
+นาย บุญมั่น ผลสวัสดิ์
+นาง นวลฉวี เชิดฉิน
+นาง พวงเพ็ญ แพนลา
+นาง ปุณณภา เจนธนยุทธ์
+นาง บุษวรรณ เชื้อชะเอม
+นาง จันทนา รสชุ่ม
+นาย กิตติกร เชื้อชะเอม
+นาง วาสนา ชมภูโคตร
+นางสาว ฉันทนา กองจันดา
+นาย ปัทม์ มกรวานิชย์
+นางสาว สุกันญา จันทร์สมร
+นาย จิตติภัส ขวัญส่ง
+นางสาว สิริกร พืชนะผล
+นาง ธฤษวรรณ นาทีชัยชนะ
+นาง ฐิติรัตน์ ฉุนกระโทก
+นางสาว ดาริกา มงคลใหม่
+นางสาว ดวงใจ เจริญทรัพย์
+นาย สิรสิทธิ์ บู่ทอง
+นาง ลัดดาวรรณ แก้วพวง
+นาย ศักดิ์นิรัญ ภูวะลี
+นาย ราเมศ กกรัมย์
+นางสาว เสาวลักษณ์ กิตติชาติมณีกุล
+นาย เฉลิมชัย วารี
+นางสาว สุรีย์ เชื้อวงษ์
+นาย โกวิทย์ วิเศษศักดิ์
+นางสาว ดัชนี คงทันดี
+นาง สมร แก่นจันทร์ใบ
+นาย ฆฤณพิสิฎฐ์ เขมอัครเจตต์
+นาย นิรันดร์ ประเสริฐศิริรัตน์
+นาง อรุชา ปิยะมิตรบัณฑิต
+นางสาว ชฎาพร ทองขาว
+นางสาว วิภาพร สมนึก
+นาง ไอริณ กกรัมย์
+นางสาว ศรุตา จันทเกตุ
+นาย รัฐศาสตร์ ใจสัตย์
+นาย นิตชัย วรรณทะมาศ
+นางสาว สุภาพร ภูผาย
+นางสาว สุดารัตน์ ทาปลัด
+นาย พิทักษ์ ศิลารักษ์
+นาง นุจรีพร เย็นดี
+นาย บริวัตร ราชสีห์
+นาย ประจักรศิลป์ แก่นจันทร์ใบ
+นางสาว กัญญาพัชร ยินดี
+นางสาว ธิดารัตน์ ใจบุญ
+นางสาว จิตสุภา ถาวรกุล
+นางสาว พัชราภรณ์ บาลลา
+นางสาว ณัฐวิกรานต์ โพธิ์สำนัก
+นาย ธีรศักดิ์ สิทฺธิปลื้ม
+นางสาว ปรียานุช นาคสวัสดิ์
+นางสาว ศศิธร เอี่ยวเฮ็ง`;
+
+    let precalculatedTeams = [];
+    let allTeacherNames = [];
+    let currentStep = 0; // 0=เริ่มใหม่, 1=แดง, 2=ฟ้า, 3=เหลือง, 4=ส้ม, 5=จบ
+    const teamConfig = [
+        { id: 'red', name: '🔴 สีแดง' },
+        { id: 'blue', name: '🔵 สีฟ้า' },
+        { id: 'yellow', name: '🟡 สีเหลือง' },
+        { id: 'orange', name: '🟠 สีส้ม' }
+    ];
+
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    // ฟังก์ชันคำนวณแบ่งทีมไว้ล่วงหน้า
+    function calculateTeams() {
+        // ประมวลผลข้อความ: ตัดบรรทัดว่าง และดึงมาเฉพาะ 3 คำแรก (คำนำหน้า ชื่อ นามสกุล) เผื่อมีการก๊อปปี้ข้อมูลที่มีตำแหน่งมาใส่ภายหลัง
+        const teachers = rawData.split('\n')
+            .map(t => {
+                let parts = t.trim().split(/\s+/);
+                if (parts.length >= 3) {
+                    return `${parts[0]} ${parts[1]} ${parts[2]}`; // เอาแค่ คำนำหน้า ชื่อ นามสกุล
+                }
+                return t.trim();
+            })
+            .filter(t => t !== '');
+            
+        allTeacherNames = teachers; // เก็บไว้ทำอนิเมชั่นสุ่ม
+        
+        let males = teachers.filter(t => t.startsWith('นาย'));
+        let females = teachers.filter(t => t.startsWith('นาง'));
+
+        males = shuffle(males);
+        females = shuffle(females);
+
+        precalculatedTeams = teamConfig.map(c => ({
+            ...c, members: [], mCount: 0, fCount: 0
+        }));
+
+        males.forEach((person, index) => {
+            precalculatedTeams[index % 4].members.push({ name: person, gender: 'm' });
+            precalculatedTeams[index % 4].mCount++;
+        });
+
+        let startIndex = males.length % 4; 
+        females.forEach((person, index) => {
+            let teamIndex = (startIndex + index) % 4;
+            precalculatedTeams[teamIndex].members.push({ name: person, gender: 'f' });
+            precalculatedTeams[teamIndex].fCount++;
+        });
+    }
+
+    // วาดโครงสร้าง UI รอไว้ตั้งแต่แรก
+    function initUI() {
+        calculateTeams(); // สุ่มเตรียมไว้
+        currentStep = 0;
+        document.getElementById('actionBtn').innerText = `▶️ เริ่มสุ่ม ${teamConfig[0].name}`;
+        
+        const container = document.getElementById('teamsContainer');
+        container.innerHTML = '';
+        
+        precalculatedTeams.forEach(team => {
+            container.innerHTML += `
+                <div class="team-card" id="card-${team.id}">
+                    <div class="team-header ${team.id}">${team.name}</div>
+                    <div class="team-stats" id="stats-${team.id}">
+                        <!-- จะแสดงเมื่อสุ่มเสร็จ -->
+                    </div>
+                    <ul class="member-list" id="list-${team.id}">
+                        <div class="waiting-text">?</div>
+                    </ul>
+                </div>
+            `;
+        });
+    }
+
+    // ฟังก์ชันดึงชื่อมั่วๆ มาทำอนิเมชั่น
+    function getRandomNames(count) {
+        let randomNames = [];
+        for(let i=0; i<count; i++) {
+            randomNames.push(allTeacherNames[Math.floor(Math.random() * allTeacherNames.length)]);
+        }
+        return randomNames;
+    }
+
+    // เมื่อกดปุ่มสุ่มสี
+    function startNextReveal() {
+        if (currentStep >= 4) {
+            initUI(); // ถ้าระบุครบ 4 สีแล้ว ให้รีเซ็ตใหม่
+            return;
+        }
+
+        const btn = document.getElementById('actionBtn');
+        btn.disabled = true; // ล็อคปุ่มกันกดรัว
+        btn.innerText = "⏳ กำลังสุ่ม...";
+
+        const team = precalculatedTeams[currentStep];
+        const cardDOM = document.getElementById(`card-${team.id}`);
+        const listDOM = document.getElementById(`list-${team.id}`);
+        
+        // ทำให้การ์ดนี้เด่นขึ้นมา
+        cardDOM.classList.add('active', 'pulsing');
+        listDOM.classList.add('animating-list');
+
+        let memberCount = team.members.length;
+        let animationDuration = 2500; // อนิเมชั่นวิ่ง 2.5 วินาที
+        let speed = 80; // เปลี่ยนชื่อทุก 80ms
+        
+        // Interval สำหรับทำรายชื่อวิ่งรัวๆ
+        let interval = setInterval(() => {
+            let fakeNames = getRandomNames(memberCount);
+            let html = '';
+            fakeNames.forEach(name => {
+                html += `<li>${name}</li>`;
+            });
+            listDOM.innerHTML = html;
+        }, speed);
+
+        // เมื่อครบเวลา หยุดวิ่ง และแสดงรายชื่อจริง
+        setTimeout(() => {
+            clearInterval(interval);
+            
+            // แสดงผลรายชื่อจริง
+            cardDOM.classList.remove('pulsing');
+            listDOM.classList.remove('animating-list');
+            cardDOM.classList.add('revealed');
+            
+            let html = '';
+            team.members.forEach(member => {
+                let colorClass = member.gender === 'm' ? 'gender-m' : 'gender-f';
+                html += `<li class="${colorClass}">${member.name}</li>`;
+            });
+            listDOM.innerHTML = html;
+
+            // แสดงสถิติชาย/หญิง
+            const statsDOM = document.getElementById(`stats-${team.id}`);
+            statsDOM.innerHTML = `รวม ${memberCount} คน (ชาย ${team.mCount} / หญิง ${team.fCount})`;
+
+            currentStep++;
+            btn.disabled = false;
+
+            // อัพเดทข้อความปุ่มสำหรับขั้นต่อไป
+            if (currentStep < 4) {
+                btn.style.backgroundColor = getTeamColorCode(precalculatedTeams[currentStep].id);
+                btn.innerText = `▶️ สุ่มสีต่อไป (${precalculatedTeams[currentStep].name})`;
+            } else {
+                btn.style.backgroundColor = '#34495e';
+                btn.innerText = `🔄 รีเซ็ตและเริ่มสุ่มใหม่`;
+            }
+
+        }, animationDuration);
+    }
+
+    function getTeamColorCode(id) {
+        if(id==='red') return '#e74c3c';
+        if(id==='blue') return '#3498db';
+        if(id==='yellow') return '#f39c12';
+        if(id==='orange') return '#e67e22';
+        return '#2ecc71';
+    }
+
+    // เริ่มต้นทำงานตอนโหลดหน้า
+    window.onload = initUI;
+</script>
+
+</body>
+</html>
