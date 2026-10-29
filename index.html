@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="UTF-8">
@@ -113,11 +113,9 @@
             border-bottom: none;
         }
         
-        /* สีของเพศตอนแสดงผลจริง */
         .revealed .gender-m { color: #2980b9; font-weight: 600; }
         .revealed .gender-f { color: #8e44ad; font-weight: 600; }
         
-        /* เอฟเฟกต์ตอนกำลังสุ่ม */
         .animating-list li {
             color: #7f8c8d;
             font-style: italic;
@@ -137,7 +135,6 @@
             animation: pulseAlert 0.3s infinite;
         }
 
-        /* สถานะรอสุ่ม */
         .waiting-text {
             text-align: center;
             padding: 50px 20px;
@@ -163,9 +160,8 @@
 </div>
 
 <script>
-    // ข้อมูลรายชื่อที่นำตำแหน่งในวงเล็บออกแล้ว
+    // ข้อมูลรายชื่อที่อัปเดต (ลบครูฆฤณพิสิฎฐ์ และ ครูบุญมั่น ออกแล้ว)
     const rawData = `นาง สิริขวัญ บุญแจ้ง
-นาย บุญมั่น ผลสวัสดิ์
 นาง นวลฉวี เชิดฉิน
 นาง พวงเพ็ญ แพนลา
 นาง ปุณณภา เจนธนยุทธ์
@@ -192,7 +188,6 @@
 นาย โกวิทย์ วิเศษศักดิ์
 นางสาว ดัชนี คงทันดี
 นาง สมร แก่นจันทร์ใบ
-นาย ฆฤณพิสิฎฐ์ เขมอัครเจตต์
 นาย นิรันดร์ ประเสริฐศิริรัตน์
 นาง อรุชา ปิยะมิตรบัณฑิต
 นางสาว ชฎาพร ทองขาว
@@ -218,13 +213,16 @@
 
     let precalculatedTeams = [];
     let allTeacherNames = [];
-    let currentStep = 0; // 0=เริ่มใหม่, 1=แดง, 2=ฟ้า, 3=เหลือง, 4=ส้ม, 5=จบ
+    let currentStep = 0; 
     const teamConfig = [
         { id: 'red', name: '🔴 สีแดง' },
         { id: 'blue', name: '🔵 สีฟ้า' },
         { id: 'yellow', name: '🟡 สีเหลือง' },
         { id: 'orange', name: '🟠 สีส้ม' }
     ];
+
+    // รายชื่อที่ต้องการล็อคให้อยู่สีแดง (ใช้เฉพาะชื่อเพื่อป้องกันปัญหาตัวสะกด/คำนำหน้า)
+    const lockedToRed = ["สุดารัตน์", "ศรุตา", "ธีรศักดิ์"];
 
     function shuffle(array) {
         for (let i = array.length - 1; i > 0; i--) {
@@ -234,47 +232,72 @@
         return array;
     }
 
-    // ฟังก์ชันคำนวณแบ่งทีมไว้ล่วงหน้า
     function calculateTeams() {
-        // ประมวลผลข้อความ: ตัดบรรทัดว่าง และดึงมาเฉพาะ 3 คำแรก (คำนำหน้า ชื่อ นามสกุล) เผื่อมีการก๊อปปี้ข้อมูลที่มีตำแหน่งมาใส่ภายหลัง
         const teachers = rawData.split('\n')
             .map(t => {
                 let parts = t.trim().split(/\s+/);
                 if (parts.length >= 3) {
-                    return `${parts[0]} ${parts[1]} ${parts[2]}`; // เอาแค่ คำนำหน้า ชื่อ นามสกุล
+                    return `${parts[0]} ${parts[1]} ${parts[2]}`;
                 }
                 return t.trim();
             })
             .filter(t => t !== '');
             
-        allTeacherNames = teachers; // เก็บไว้ทำอนิเมชั่นสุ่ม
+        allTeacherNames = teachers; 
         
-        let males = teachers.filter(t => t.startsWith('นาย'));
-        let females = teachers.filter(t => t.startsWith('นาง'));
-
-        males = shuffle(males);
-        females = shuffle(females);
-
-        precalculatedTeams = teamConfig.map(c => ({
-            ...c, members: [], mCount: 0, fCount: 0
+        precalculatedTeams = teamConfig.map((c, index) => ({
+            ...c, members: [], mCount: 0, fCount: 0, originalIndex: index
         }));
 
-        males.forEach((person, index) => {
-            precalculatedTeams[index % 4].members.push({ name: person, gender: 'm' });
-            precalculatedTeams[index % 4].mCount++;
+        let poolMales = [];
+        let poolFemales = [];
+
+        // แยกรายชื่อคนที่ถูกล็อค และคนที่เหลือ
+        teachers.forEach(t => {
+            let isLocked = lockedToRed.some(lockedName => t.includes(lockedName));
+            let isMale = t.startsWith('นาย');
+
+            if (isLocked) {
+                // ใส่สีแดง (index 0) ทันที
+                precalculatedTeams[0].members.push({ name: t, gender: isMale ? 'm' : 'f' });
+                if (isMale) precalculatedTeams[0].mCount++;
+                else precalculatedTeams[0].fCount++;
+            } else {
+                // ใส่ตะกร้ารอสุ่ม
+                if (isMale) poolMales.push(t);
+                else poolFemales.push(t);
+            }
         });
 
-        let startIndex = males.length % 4; 
-        females.forEach((person, index) => {
-            let teamIndex = (startIndex + index) % 4;
-            precalculatedTeams[teamIndex].members.push({ name: person, gender: 'f' });
-            precalculatedTeams[teamIndex].fCount++;
+        // สุ่มคนที่เหลือในตะกร้า
+        poolMales = shuffle(poolMales);
+        poolFemales = shuffle(poolFemales);
+
+        // ระบบ Auto-Balance ผู้ชาย: เช็คว่าทีมไหนผู้ชายน้อยที่สุด ให้ใส่ทีมนั้นก่อน
+        poolMales.forEach(person => {
+            precalculatedTeams.sort((a, b) => a.mCount - b.mCount);
+            precalculatedTeams[0].members.push({ name: person, gender: 'm' });
+            precalculatedTeams[0].mCount++;
+        });
+
+        // ระบบ Auto-Balance ผู้หญิง: เช็คว่าทีมไหนผู้หญิงน้อยที่สุด ให้ใส่ทีมนั้นก่อน
+        poolFemales.forEach(person => {
+            precalculatedTeams.sort((a, b) => a.fCount - b.fCount);
+            precalculatedTeams[0].members.push({ name: person, gender: 'f' });
+            precalculatedTeams[0].fCount++;
+        });
+
+        // คืนค่าลำดับทีมให้กลับมาเป็น แดง, ฟ้า, เหลือง, ส้ม เหมือนเดิม
+        precalculatedTeams.sort((a, b) => a.originalIndex - b.originalIndex);
+
+        // สับเปลี่ยนลำดับคนภายในทีมอีกครั้ง (เพื่อให้คนที่โดนล็อคไม่กองอยู่บรรทัดแรก)
+        precalculatedTeams.forEach(team => {
+            team.members = shuffle(team.members);
         });
     }
 
-    // วาดโครงสร้าง UI รอไว้ตั้งแต่แรก
     function initUI() {
-        calculateTeams(); // สุ่มเตรียมไว้
+        calculateTeams();
         currentStep = 0;
         document.getElementById('actionBtn').innerText = `▶️ เริ่มสุ่ม ${teamConfig[0].name}`;
         
@@ -285,9 +308,7 @@
             container.innerHTML += `
                 <div class="team-card" id="card-${team.id}">
                     <div class="team-header ${team.id}">${team.name}</div>
-                    <div class="team-stats" id="stats-${team.id}">
-                        <!-- จะแสดงเมื่อสุ่มเสร็จ -->
-                    </div>
+                    <div class="team-stats" id="stats-${team.id}"></div>
                     <ul class="member-list" id="list-${team.id}">
                         <div class="waiting-text">?</div>
                     </ul>
@@ -296,7 +317,6 @@
         });
     }
 
-    // ฟังก์ชันดึงชื่อมั่วๆ มาทำอนิเมชั่น
     function getRandomNames(count) {
         let randomNames = [];
         for(let i=0; i<count; i++) {
@@ -305,30 +325,27 @@
         return randomNames;
     }
 
-    // เมื่อกดปุ่มสุ่มสี
     function startNextReveal() {
         if (currentStep >= 4) {
-            initUI(); // ถ้าระบุครบ 4 สีแล้ว ให้รีเซ็ตใหม่
+            initUI(); 
             return;
         }
 
         const btn = document.getElementById('actionBtn');
-        btn.disabled = true; // ล็อคปุ่มกันกดรัว
+        btn.disabled = true;
         btn.innerText = "⏳ กำลังสุ่ม...";
 
         const team = precalculatedTeams[currentStep];
         const cardDOM = document.getElementById(`card-${team.id}`);
         const listDOM = document.getElementById(`list-${team.id}`);
         
-        // ทำให้การ์ดนี้เด่นขึ้นมา
         cardDOM.classList.add('active', 'pulsing');
         listDOM.classList.add('animating-list');
 
         let memberCount = team.members.length;
-        let animationDuration = 2500; // อนิเมชั่นวิ่ง 2.5 วินาที
-        let speed = 80; // เปลี่ยนชื่อทุก 80ms
+        let animationDuration = 2500; 
+        let speed = 80; 
         
-        // Interval สำหรับทำรายชื่อวิ่งรัวๆ
         let interval = setInterval(() => {
             let fakeNames = getRandomNames(memberCount);
             let html = '';
@@ -338,11 +355,9 @@
             listDOM.innerHTML = html;
         }, speed);
 
-        // เมื่อครบเวลา หยุดวิ่ง และแสดงรายชื่อจริง
         setTimeout(() => {
             clearInterval(interval);
             
-            // แสดงผลรายชื่อจริง
             cardDOM.classList.remove('pulsing');
             listDOM.classList.remove('animating-list');
             cardDOM.classList.add('revealed');
@@ -354,14 +369,12 @@
             });
             listDOM.innerHTML = html;
 
-            // แสดงสถิติชาย/หญิง
             const statsDOM = document.getElementById(`stats-${team.id}`);
             statsDOM.innerHTML = `รวม ${memberCount} คน (ชาย ${team.mCount} / หญิง ${team.fCount})`;
 
             currentStep++;
             btn.disabled = false;
 
-            // อัพเดทข้อความปุ่มสำหรับขั้นต่อไป
             if (currentStep < 4) {
                 btn.style.backgroundColor = getTeamColorCode(precalculatedTeams[currentStep].id);
                 btn.innerText = `▶️ สุ่มสีต่อไป (${precalculatedTeams[currentStep].name})`;
@@ -381,7 +394,6 @@
         return '#2ecc71';
     }
 
-    // เริ่มต้นทำงานตอนโหลดหน้า
     window.onload = initUI;
 </script>
 
